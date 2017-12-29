@@ -13,19 +13,37 @@ def getTileList() :
     return list["result"]
 
 def parseTitleInfoLi( li ):
-    return{
+    ret = {
         "id" : li['id'],
         "data-kana" : li['data-kana'],
         "title" : li.find("h4",{"class":"listItem"}).string,
         "personality" :  li.find("p",{"class":"navigator listItem"}).string,
+        "update" :  li.find("p",{"class":"update listItem"}).string,
         "thumbnail" :  li.find("p",{"class":"thumbnail listItem"}).find('img')['src']
     }
+    guest = li.find("li",{"data-guest":True})
+    if not guest == None:
+        guest = guest.string
+    ret["guest"] = guest
+    return ret
 
 def getTitleInfo(id):
     html = urlopen("http://www.onsen.ag/data/api/getMovieInfo/" + id)
     body = callback.search(html.read().decode('utf8')).group(1)
     list = json.loads(body)
     return list
+
+def getTitleInfoOfDayNum(day,num,titles=None):
+    if titles == None:
+        titles = {}
+        d = getDayId(day)
+        if d == "latest" :
+            titles = getNewTitle()
+        else:
+            titles = getTitleOfDay(d)
+    ret=""
+    title=titles[num]
+    return title
 
 def getTitleOfDay(day):
     html = urlopen("http://www.onsen.ag")

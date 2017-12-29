@@ -7,18 +7,23 @@ def lambda_handler(request_obj, context=None):
 
 @alexa.default_handler()
 def default_handler(request):
-    return alexa.respond('再生したい番組を教えてください').with_card(getStringListOfDay("最新"))
-
+    card = alexa.create_card(title="最新の番組一覧", subtitle=None,
+                             content=oi.getStringListOfDay("最新"))    
+    
+    return alexa.create_response('再生したい番組を教えてください',
+                                 end_session=False, card_obj=card)
 
 @alexa.request_handler("LaunchRequest")
 def launch_request_handler(request):
-    return alexa.respond('再生したい番組を教えてください').with_card(getStringListOfDay("最新"))
-
+    card = alexa.create_card(title="最新の番組一覧", subtitle=None,
+                             content=oi.getStringListOfDay("最新"))    
+    
+    return alexa.create_response('再生したい番組を教えてください',
+                                 end_session=False, card_obj=card)
 
 @alexa.request_handler("SessionEndedRequest")
 def session_ended_request_handler(request):
     return alexa.create_response(message="Goodbye!")
-
 
 @alexa.intent_handler('GetChannelListIntent')
 def get_channel_list_intent_handler(request):
@@ -42,6 +47,45 @@ def get_channel_list_intent_handler(request):
     return alexa.create_response(speech_content,
                                  end_session=False, card_obj=card)
 
+@alexa.intent_handler('GetDetailIntent')
+def get_detail_info_intent_handler(request):
+    day = request.get_slot_value("day")
+    num = request.get_slot_value("num")
+    if num == None:
+        num=1
+    num=int(num)-1
+    info = oi.getTitleInfoOfDayNum(day,num)
+    print(info)
+    card_text="{0}\nパーソナリティー {1}".format(info["update"],info["personality"])
+    if not info["guest"] == None:
+        card_text+="\nゲストは {0}".format(info["guest"])
+    card_image = { "smallImageUrl" : info["thumbnail"] , "largeImageUrl" : info["thumbnail"] } #image指定はalexa_io.pyを拡張
+    speech_content="{0} {1}".format(info["data-kana"],card_text)
+    card = alexa.create_card(title="{0}".format(info["title"]),
+                             text=card_text, card_type="Standard", image=card_image)
+    
+    return alexa.create_response(speech_content,
+                                 end_session=False, card_obj=card)
+
+@alexa.intent_handler('PlayIntent')
+def play_intent_handler(request):
+    day = request.get_slot_value("day")
+    num = request.get_slot_value("num")
+    if num == None:
+        num=1
+    num=int(num)-1
+    info=oi.getPlayInfoOfDayNum(day,num)
+    return alexa.audio_play_response(url=info["moviePath"]["pc"])
+
+@alexa.intent_handler('PlayDayIntent')
+def play_intent_handler(request):
+    day = request.get_slot_value("day")
+    info=oi.getPlayInfoOfDayNum(day,0)
+    return alexa.audio_play_response(url=info["moviePath"]["pc"])
+    
+@alexa.intent_handler('AMAZON.StopIntent')
+def audio_stop_intent_handler(request):
+    return alexa.audio_stop_response()
 
 if __name__ == "__main__":    
     
