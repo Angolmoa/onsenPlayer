@@ -1,7 +1,10 @@
 from ask import alexa
 import onsenInfo as oi
 
+help_msg="「月曜の1番を再生」など曜日と番号を指定します。\n「月曜の番組一覧」などで各曜日の番組リストを取得できます。"
+
 def lambda_handler(request_obj, context=None):
+    print(request_obj)
     metadata = {}
     return alexa.route_request(request_obj, metadata)
 
@@ -9,7 +12,6 @@ def lambda_handler(request_obj, context=None):
 def default_handler(request):
     card = alexa.create_card(title="最新の番組一覧", subtitle=None,
                              content=oi.getStringListOfDay("最新"))    
-    
     return alexa.create_response('再生したい番組を教えてください',
                                  end_session=False, card_obj=card)
 
@@ -17,7 +19,6 @@ def default_handler(request):
 def launch_request_handler(request):
     card = alexa.create_card(title="最新の番組一覧", subtitle=None,
                              content=oi.getStringListOfDay("最新"))    
-    
     return alexa.create_response('再生したい番組を教えてください',
                                  end_session=False, card_obj=card)
 
@@ -32,7 +33,6 @@ def get_channel_list_intent_handler(request):
     print(day)
     if day == None:
         return alexa.create_response("Could not find an ingredient!")
-
     d=oi.getDayId(day)
     titles={}
     if d == "latest" :
@@ -43,7 +43,6 @@ def get_channel_list_intent_handler(request):
     speech_content=oi.getStringListOfDay(day,titles,True)
     card = alexa.create_card(title="{0}の番組一覧".format(day), subtitle=None,
                              content=card_content)    
-    
     return alexa.create_response(speech_content,
                                  end_session=False, card_obj=card)
 
@@ -67,6 +66,14 @@ def get_detail_info_intent_handler(request):
     return alexa.create_response(speech_content,
                                  end_session=False, card_obj=card)
 
+def play_day_num(day,num,endSession=False):
+    info=oi.getPlayInfoOfDayNum(day,num)
+    if info==None:
+        return None, None
+    if len(info["moviePath"]["pc"])>0:
+        return alexa.audio_play_response(url=info["moviePath"]["pc"],day=day,num=num), info["title"]
+    return None, info["title"]
+
 @alexa.intent_handler('PlayIntent')
 def play_intent_handler(request):
     day = request.get_slot_value("day")
@@ -74,18 +81,84 @@ def play_intent_handler(request):
     if num == None:
         num=1
     num=int(num)-1
-    info=oi.getPlayInfoOfDayNum(day,num)
-    return alexa.audio_play_response(url=info["moviePath"]["pc"])
+    res, title = play_day_num(day,num)
+    if res==None:
+        if title==None:
+            return alexa.create_response("{0} {1}は無効な番組です".format(day,num+1), end_session=False)
+        return alexa.create_response("{0}は再生できない番組です".format(title), end_session=False)
+    return res
 
 @alexa.intent_handler('PlayDayIntent')
-def play_intent_handler(request):
+def play_day_intent_handler(request):
     day = request.get_slot_value("day")
     info=oi.getPlayInfoOfDayNum(day,0)
-    return alexa.audio_play_response(url=info["moviePath"]["pc"])
-    
+    res, title = play_day_num(day,num)
+    if res==None:
+        if title==None:
+            return alexa.create_response("{0} {1}は無効な番組です".format(day,num+1), end_session=False)
+        return alexa.create_response("{0}は再生できない番組です".format(title), end_session=False)
+    return res
+
+def play_next(day,num,endSession=True):
+    res,title=play_day_num(day,num+1,endSession)
+    if res==None:
+        if title==None:
+            return alexa.create_response(end_session=True)
+        return enqueue_next(day,0,endSession)
+    return res
+
+@alexa.intent_handler('AMAZON.NextIntent')
+def audio_next_intent_handler(request):
+    token = request.get_token().split(",")
+    day = token[0]
+    num = int(token[1])
+    return play_next(day,num,endSession=True)
+
+def enqueue_day_num(day,num):
+    info=oi.getPlayInfoOfDayNum(day,num)
+    if info==None:
+        return None
+    if len(info["moviePath"]["pc"])>0:
+        return alexa.audio_play_response(url=info["moviePath"]["pc"],day=day,num=num,playBehavior="ENQUEUE",endSession=True)
+    return None
+
+def enqueue_next(day,num):
+    res=enqueue_day_num(day,num+1)
+    if res==None:
+        if num==0:
+            return alexa.create_response(end_session=True)
+        return enqueue_next(day,0)
+    return res
+
+@alexa.request_handler('AudioPlayer.PlaybackNearlyFinished')
+def playback_nearly_finished_request_handler(request):
+    token = request.get_token().split(",")
+    day = token[0]
+    num = int(token[1])
+    return enqueue_next(day,num)
+
+@alexa.request_handler('AudioPlayer.PlaybackStarted')
+def playback_started_request_handler(request):
+    return alexa.create_response(end_session=True)
+
 @alexa.intent_handler('AMAZON.StopIntent')
 def audio_stop_intent_handler(request):
     return alexa.audio_stop_response()
+    
+@alexa.intent_handler('AMAZON.PauseIntent')
+def audio_pause_intent_handler(request):
+    return alexa.audio_stop_response()
+    
+@alexa.intent_handler('AMAZON.ResumeIntent')
+def audio_resume_intent_handler(request):
+    return alexa.audio_resume_response()
+    
+@alexa.intent_handler('AMAZON.HelpIntent')
+def help_intent_handler(request):
+    card = alexa.create_card(title="つかいかた",
+                             text=help_msg)    
+    return alexa.create_response(help_msg,
+                                 end_session=False, card_obj=card)
 
 if __name__ == "__main__":    
     

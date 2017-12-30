@@ -6,9 +6,10 @@ from bs4 import BeautifulSoup
 callback = re.compile('callback\((.*)\);')
 weekChar={"月曜":"mon","火曜":"tue","水曜":"wed","木曜":"thu","金曜":"fri","土曜":"sat","日曜":"sat","今日":"latest","最新":"latest"}
 weekNum=["mon","tue","wed","thu","fri","sat","sat"]
+baseURL="https://www.onsen.ag"
 
 def getTileList() :
-    html = urlopen("http://www.onsen.ag/api/shownMovie/shownMovie.json")
+    html = urlopen(baseURL+"/api/shownMovie/shownMovie.json")
     list = json.loads(html.read().decode('utf8'))
     return list["result"]
 
@@ -19,7 +20,7 @@ def parseTitleInfoLi( li ):
         "title" : li.find("h4",{"class":"listItem"}).string,
         "personality" :  li.find("p",{"class":"navigator listItem"}).string,
         "update" :  li.find("p",{"class":"update listItem"}).string,
-        "thumbnail" :  li.find("p",{"class":"thumbnail listItem"}).find('img')['src']
+        "thumbnail" :  baseURL + li.find("p",{"class":"thumbnail listItem"}).find('img')['src']
     }
     guest = li.find("li",{"data-guest":True})
     if not guest == None:
@@ -28,11 +29,23 @@ def parseTitleInfoLi( li ):
     return ret
 
 def getTitleInfo(id):
-    html = urlopen("http://www.onsen.ag/data/api/getMovieInfo/" + id)
+    html = urlopen(baseURL+"/data/api/getMovieInfo/" + id)
     body = callback.search(html.read().decode('utf8')).group(1)
     list = json.loads(body)
     return list
 
+def getPlayInfoOfDayNum(day,num,titles=None):
+    if titles == None:
+        titles = {}
+        d = getDayId(day)
+        if d == "latest" :
+            titles = getNewTitle()
+        else:
+            titles = getTitleOfDay(d)
+    ret=""
+    if len(titles)>num:
+        return getTitleInfo(titles[num]["id"])
+    return None
 def getTitleInfoOfDayNum(day,num,titles=None):
     if titles == None:
         titles = {}
@@ -46,7 +59,7 @@ def getTitleInfoOfDayNum(day,num,titles=None):
     return title
 
 def getTitleOfDay(day):
-    html = urlopen("http://www.onsen.ag")
+    html = urlopen(baseURL)
     bsObj = BeautifulSoup(html, "html.parser")
     titles = bsObj.findAll("li",{"data-week":day})
     ret = []
@@ -55,7 +68,7 @@ def getTitleOfDay(day):
     return ret
 
 def getNewTitle():
-    html = urlopen("http://www.onsen.ag")
+    html = urlopen(baseURL)
     bsObj = BeautifulSoup(html, "html.parser")
     titles = bsObj.findAll("li",{"class":"clr active newChecked"})
     ret = []

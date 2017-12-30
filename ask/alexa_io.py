@@ -67,6 +67,9 @@ class Request(object):
     def get_slot_map(self):
         return {slot_name : self.get_slot_value(slot_name) for slot_name in self.get_slot_names()}
 
+    def get_token(self):
+        return self.request["context"]["AudioPlayer"]["token"]
+
 
 class ResponseBuilder(object):
     """
@@ -133,27 +136,39 @@ class ResponseBuilder(object):
         return card
 
     @classmethod
-    def audio_play_response(self, url):
+    def audio_play_response(self, url, day, num, playBehavior="REPLACE_ALL",endSession=False):
         response = eval(RAW_RESPONSE)
         response["response"]["directives"]=[{
             "type": "AudioPlayer.Play",
-            "playBehavior": "REPLACE_ALL",
+            "playBehavior": playBehavior,
             "audioItem": {
                 "stream": {
-                    "token": "12345",
+                    "token": "{0},{1}".format(day,num),
                     "url": url,
                     "offsetInMilliseconds": 0
                 }
             }
         }]
+        response['response']['shouldEndSession'] = endSession
         return response
 
     @classmethod
-    def audio_stop_response(self):
+    def audio_stop_response(self,endSession=False):
         response = eval(RAW_RESPONSE)
         response["response"]["directives"]=[{
             "type": "AudioPlayer.Stop"
         }]
+        response['response']['shouldEndSession'] = endSession
+        return response
+
+    @classmethod
+    def audio_resume_response(self,endSession=False):
+        response = eval(RAW_RESPONSE)
+        response["response"]["directives"]=[{
+            "type": "AudioPlayer.Play",
+            "playBehavior": "REPLACE_ALL"
+        }]
+        response['response']['shouldEndSession'] = endSession
         return response
 
 class VoiceHandler(ResponseBuilder):
@@ -209,4 +224,5 @@ class VoiceHandler(ResponseBuilder):
 
         response = handler_fn(request)
         response['sessionAttributes'] = request.session
+        print(response)
         return response
